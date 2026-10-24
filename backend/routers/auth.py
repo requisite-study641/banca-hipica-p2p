@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, Header, HTTPException
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from ..database import ROLE_USER, AuthToken, User, get_db
+from database import ROLE_USER, AuthToken, User, get_db
 from ..schemas import AdminUserCreate, AuthResponse, LoginRequest, RegisterRequest, UserOut
 from ..security import create_token, get_current_user, hash_password, require_superadmin, verify_password
 

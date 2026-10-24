@@ -3,7 +3,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-from ..database import VALID_RULES, Duel, DuelType, get_db
+from database import VALID_RULES, Duel, DuelType, get_db
 from ..schemas import DuelTypeCreate, DuelTypeUpdate
 from ..security import require_admin
 
