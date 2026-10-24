@@ -13,7 +13,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
-from . import database
+import database
 from .routers import audit, auth, duel_types, payments, races, duels
 
 app = FastAPI(
