@@ -171,9 +171,8 @@ def create_duel(
     if race_datetime.tzinfo is not None:
         race_datetime = race_datetime.astimezone(timezone.utc).replace(tzinfo=None)
 
-    # Nota: Si estás probando con horas pasadas debido al desfase de Render, 
-    # puedes comentar la condición `if now >= race_datetime:` temporalmente:
     now = datetime.now(timezone.utc).replace(tzinfo=None)
+    # Validacion comentada temporalmente para pruebas continuas en produccion
     # if now >= race_datetime:
     #     raise HTTPException(
     #         status_code=400,
@@ -249,8 +248,6 @@ def accept_duel(
         )
 
     now = datetime.now(timezone.utc).replace(tzinfo=None)
-    # if duel.race_datetime and duel.race_datetime <= now:
-    #     raise HTTPException(status_code=409, detail="El duelo ha expirado por tiempo de carrera.")
     if duel.status != DUEL_OPEN:
         raise HTTPException(status_code=409, detail="El duelo ya no está disponible.")
     if duel.creator_id == user.id:
@@ -301,6 +298,26 @@ def cancel_duel(
     db.delete(duel)
     db.commit()
     return {"detail": "Duelo cancelado y stake reembolsado.", "id": duel_id}
+
+
+# ─────────────────────── Utilidad de Reembolso por Cierre de Carrera ───────────────────────
+def refund_open_duels_for_race(db: Session, race_number: int):
+    """Busca todos los duelos OPEN de una carrera cerrada y reembolsa el stake al creador."""
+    open_duels = db.query(Duel).filter(
+        Duel.race_number == race_number,
+        Duel.status == DUEL_OPEN
+    ).all()
+
+    for duel in open_duels:
+        creator = db.get(User, duel.creator_id)
+        if creator is not None:
+            creator.balance = round((creator.balance or 0.0) + duel.stake, 2)
+        
+        duel.status = DUEL_RESOLVED
+        duel.resolution_note = f"Carrera {race_number} cerrada por administración -> Reembolso automático de stake."
+        duel.resolved_at = datetime.utcnow()
+    
+    db.commit()
 
 
 # ─────────────────────── Panel Admin ───────────────────────
@@ -394,21 +411,17 @@ def _resolve_morocha_duel(db: Session, duel: Duel, positions: dict, note: Option
     c1, c2 = duel.horse_creator, duel.horse_creator_2
     o1, o2 = duel.horse_opponent, duel.horse_opponent_2
 
-    # Recopilar parejas válidas (caballo, posición) para cada bando dentro del top 5 (1 al 5)
     creator_entries = [(h, positions.get(h)) for h in (c1, c2) if positions.get(h) in (1, 2, 3, 4, 5)]
     opponent_entries = [(h, positions.get(h)) for h in (o1, o2) if positions.get(h) in (1, 2, 3, 4, 5)]
 
-    # Obtener el mejor registro (menor posición numérica) para el creador y el oponente
-    best_creator = min(creator_entries, key=lambda x: x[1]) if creator_entries else None    # Retorna (horse, pos)
-    best_opponent = min(opponent_entries, key=lambda x: x[1]) if opponent_entries else None  # Retorna (horse, pos)
+    best_creator = min(creator_entries, key=lambda x: x[1]) if creator_entries else None
+    best_opponent = min(opponent_entries, key=lambda x: x[1]) if opponent_entries else None
 
-    # 1. Ambos bandos totalmente fuera del top 5 -> Reembolso total sin comisión
     if not best_creator and not best_opponent:
         return _resolve_refund(
             db, duel, note or "Morocha: Ninguno de los 4 caballos clasificó en el top 5 -> reembolso sin comisión."
         )
 
-    # 2. Solo el creador clasifica en el top 5
     if best_creator and not best_opponent:
         h_win, p_win = best_creator
         return _resolve_payout(
@@ -416,7 +429,6 @@ def _resolve_morocha_duel(db: Session, duel: Duel, positions: dict, note: Option
             note or f"Morocha: Gana el creador con el N.º {h_win} ({p_win}.º puesto) — rivales fuera del top 5."
         )
 
-    # 3. Solo el rival clasifica en el top 5
     if not best_creator and best_opponent:
         h_win, p_win = best_opponent
         return _resolve_payout(
@@ -425,7 +437,6 @@ def _resolve_morocha_duel(db: Session, duel: Duel, positions: dict, note: Option
             force_acceptor_win=True
         )
 
-    # 4. Ambos clasifican: gana el que tenga estrictamente la mejor posición (menor número)
     h_c, p_c = best_creator
     h_o, p_o = best_opponent
 
@@ -441,7 +452,6 @@ def _resolve_morocha_duel(db: Session, duel: Duel, positions: dict, note: Option
             force_acceptor_win=True
         )
     else:
-        # En caso de coincidencia exacta de posición
         return _resolve_refund(
             db, duel, note or f"Morocha: Empate exacto en la posición {p_c}.º, reembolso."
         )
@@ -483,11 +493,9 @@ def resolve_duel_core(
         is_morocha = getattr(duel_type, "is_morocha", False)
         is_matchup = getattr(duel_type, "is_matchup", False)
 
-        # ── INTERCEPCIÓN SEGURA PARA MOROCHA ──
         if is_morocha:
             return _resolve_morocha_duel(db, duel, positions, note)
 
-        # ── CASO GENERAL: Duelos donde el resultado depende de UN SOLO EJEMPLAR ──
         if not is_matchup:
             target_horse = duel.horse_creator
             pos_target = positions.get(target_horse) if positions else None
@@ -517,7 +525,6 @@ def resolve_duel_core(
                 outcome_note = note or f"Marcador oficial: N.º {target_horse} llegó {pos_str} — No cumple la condición (Gana el Aceptador)."
                 return _resolve_payout(db, duel, target_horse, outcome_note, force_acceptor_win=True)
 
-        # ── CASO MARCAS / ENFRENTAMIENTOS (2 caballos distintos) ──
         winner_horse, outcome_note = official_outcome(
             positions, duel.horse_creator, duel.horse_opponent
         )
