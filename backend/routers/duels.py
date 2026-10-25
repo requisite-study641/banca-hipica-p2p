@@ -481,7 +481,6 @@ def _resolve_morocha_duel(db: Session, duel: Duel, positions: dict, note: Option
             db, duel, note or f"Morocha: Empate exacto en la posición {p_c}.º, reembolso."
         )
     
-
 def resolve_duel_core(
     db: Session,
     duel: Duel,
