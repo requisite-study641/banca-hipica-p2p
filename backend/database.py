@@ -213,7 +213,7 @@ class DuelType(Base):
     __tablename__ = "duel_types"
 
     id = Column(Integer, primary_key=True)
-    name = Column(String(120), nullable=False)
+    name = Column(String(120), nullable=False, unique=True)
     logic_rule = Column(String(60), nullable=False)
     description = Column(Text, nullable=False, default="")
     is_matchup = Column(Boolean, nullable=False, default=False)  # MARCAS
@@ -440,7 +440,7 @@ def official_outcome(
 
 # ─────────────────────────────── Seed inicial ───────────────────────────────
 def seed_initial_data() -> None:
-    """Crea las tablas y siembra: superadministrador, los 19 tipos de duelo y fila bancaria."""
+    """Crea las tablas y siembra: superadministrador, los tipos de duelo y fila bancaria de forma segura."""
     Base.metadata.create_all(bind=engine)
     db = SessionLocal()
     try:
@@ -456,30 +456,39 @@ def seed_initial_data() -> None:
                 )
             )
 
-        # Carga/Refresco de los 19 tipos de duelo predefinidos
-        db.query(DuelType).delete()
+        # Lista oficial de tipos de duelo a asegurar
         initial_types = [
-            DuelType(name="PELO a PELO", logic_rule=RULE_OFFICIAL, description="Ganas con el 1ro."),
-            DuelType(name="1y2N", logic_rule=RULE_OFFICIAL, description="Ganas con el 1ro, con el 2do Pierdes la Mitad."),
-            DuelType(name="2N", logic_rule=RULE_OFFICIAL, description="Ganas con el 1ro, con el 2do Empatas."),
-            DuelType(name="2y2N", logic_rule=RULE_OFFICIAL, description="Ganas con el 1ro, con el 2do Ganas la Mitad."),
-            DuelType(name="2 PUESTOS", logic_rule=RULE_OFFICIAL, description="Ganas con el 1ro y con el 2do."),
-            DuelType(name="2y3N", logic_rule=RULE_OFFICIAL, description="Ganas con el 1ro y el 2do, con el 3ro Pierdes la Mitad."),
-            DuelType(name="3N", logic_rule=RULE_OFFICIAL, description="Ganas con el 1ro y el 2do, con el 3ro Empatas."),
-            DuelType(name="3y3N", logic_rule=RULE_OFFICIAL, description="Ganas con el 1ro y el 2do, con el 3ro Ganas la Mitad."),
-            DuelType(name="3 PUESTOS", logic_rule=RULE_OFFICIAL, description="Ganas con el 1ro, 2do y el 3ro."),
-            DuelType(name="3y4N", logic_rule=RULE_OFFICIAL, description="Ganas con el 1ro, 2do y 3ro, con el 4to Pierdes la Mitad."),
-            DuelType(name="4N", logic_rule=RULE_OFFICIAL, description="Ganas con el 1ro, 2do y 3ro, con el 4to Empatas."),
-            DuelType(name="4y4N", logic_rule=RULE_OFFICIAL, description="Ganas con el 1ro, 2do y el 3ro, con el 4to Ganas la Mitad."),
-            DuelType(name="4 PUESTOS", logic_rule=RULE_OFFICIAL, description="Ganas con el 1ro, 2do, 3ro y el 4to."),
-            DuelType(name="4y5N", logic_rule=RULE_OFFICIAL, description="Ganas con el 1ro, 2do, 3ro y 4to, con el 5to Pierdes la Mitad."),
-            DuelType(name="5N", logic_rule=RULE_OFFICIAL, description="Ganas con el 1ro, 2do, 3ro y 4to, con el 5to Empatas."),
-            DuelType(name="5y5N", logic_rule=RULE_OFFICIAL, description="Ganas con el 1ro, 2do, 3ro y el 4to, con el 5to Ganas la Mitad."),
-            DuelType(name="5 PUESTOS", logic_rule=RULE_OFFICIAL, description="Ganas con el 1ro, 2do, 3ro, 4to y el 5to."),
-            DuelType(name="MARCAS", logic_rule=RULE_OFFICIAL, description="Caballo vs Caballo.", is_matchup=True),
-            DuelType(name="MOROCHA", logic_rule=RULE_OFFICIAL, description="2 Caballos vs 2 Caballos.", is_morocha=True),
+            {"name": "PELO a PELO", "logic_rule": RULE_OFFICIAL, "description": "Ganas con el 1ro.", "is_matchup": False, "is_morocha": False},
+            {"name": "1y2N", "logic_rule": RULE_OFFICIAL, "description": "Ganas con el 1ro, con el 2do Pierdes la Mitad.", "is_matchup": False, "is_morocha": False},
+            {"name": "2N", "logic_rule": RULE_OFFICIAL, "description": "Ganas con el 1ro, con el 2do Empatas.", "is_matchup": False, "is_morocha": False},
+            {"name": "2y2N", "logic_rule": RULE_OFFICIAL, "description": "Ganas con el 1ro, con el 2do Ganas la Mitad.", "is_matchup": False, "is_morocha": False},
+            {"name": "2 PUESTOS", "logic_rule": RULE_OFFICIAL, "description": "Ganas con el 1ro y con el 2do.", "is_matchup": False, "is_morocha": False},
+            {"name": "2y3N", "logic_rule": RULE_OFFICIAL, "description": "Ganas con el 1ro y el 2do, con el 3ro Pierdes la Mitad.", "is_matchup": False, "is_morocha": False},
+            {"name": "3N", "logic_rule": RULE_OFFICIAL, "description": "Ganas con el 1ro y el 2do, con el 3ro Empatas.", "is_matchup": False, "is_morocha": False},
+            {"name": "3y3N", "logic_rule": RULE_OFFICIAL, "description": "Ganas con el 1ro y el 2do, con el 3ro Ganas la Mitad.", "is_matchup": False, "is_morocha": False},
+            {"name": "3 PUESTOS", "logic_rule": RULE_OFFICIAL, "description": "Ganas con el 1ro, 2do y el 3ro.", "is_matchup": False, "is_morocha": False},
+            {"name": "3y4N", "logic_rule": RULE_OFFICIAL, "description": "Ganas con el 1ro, 2do y 3ro, con el 4to Pierdes la Mitad.", "is_matchup": False, "is_morocha": False},
+            {"name": "4N", "logic_rule": RULE_OFFICIAL, "description": "Ganas con el 1ro, 2do y 3ro, con el 4to Empatas.", "is_matchup": False, "is_morocha": False},
+            {"name": "4y4N", "logic_rule": RULE_OFFICIAL, "description": "Ganas con el 1ro, 2do y el 3ro, con el 4to Ganas la Mitad.", "is_matchup": False, "is_morocha": False},
+            {"name": "4 PUESTOS", "logic_rule": RULE_OFFICIAL, "description": "Ganas con el 1ro, 2do, 3ro y el 4to.", "is_matchup": False, "is_morocha": False},
+            {"name": "4y5N", "logic_rule": RULE_OFFICIAL, "description": "Ganas con el 1ro, 2do, 3ro y 4to, con el 5to Pierdes la Mitad.", "is_matchup": False, "is_morocha": False},
+            {"name": "5N", "logic_rule": RULE_OFFICIAL, "description": "Ganas con el 1ro, 2do, 3ro y 4to, con el 5to Empatas.", "is_matchup": False, "is_morocha": False},
+            {"name": "5y5N", "logic_rule": RULE_OFFICIAL, "description": "Ganas con el 1ro, 2do, 3ro y el 4to, con el 5to Ganas la Mitad.", "is_matchup": False, "is_morocha": False},
+            {"name": "5 PUESTOS", "logic_rule": RULE_OFFICIAL, "description": "Ganas con el 1ro, 2do, 3ro, 4to y el 5to.", "is_matchup": False, "is_morocha": False},
+            {"name": "MARCAS", "logic_rule": RULE_OFFICIAL, "description": "Caballo vs Caballo.", "is_matchup": True, "is_morocha": False},
+            {"name": "MOROCHA", "logic_rule": RULE_OFFICIAL, "description": "2 Caballos vs 2 Caballos.", "is_matchup": False, "is_morocha": True},
         ]
-        db.add_all(initial_types)
+
+        # Inserción idempotente (actualiza o crea sin borrar registros existentes con relaciones)
+        for t_data in initial_types:
+            existing = db.query(DuelType).filter(DuelType.name == t_data["name"]).first()
+            if not existing:
+                db.add(DuelType(**t_data))
+            else:
+                existing.logic_rule = t_data["logic_rule"]
+                existing.description = t_data["description"]
+                existing.is_matchup = t_data["is_matchup"]
+                existing.is_morocha = t_data["is_morocha"]
 
         if db.query(BankInfo).count() == 0:
             db.add(BankInfo())
