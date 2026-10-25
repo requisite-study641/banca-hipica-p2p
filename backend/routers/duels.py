@@ -340,7 +340,15 @@ def _resolve_refund(db: Session, duel: Duel, note: str) -> dict:
 
 
 def _resolve_payout(db: Session, duel: Duel, winner_horse: int, note: str, force_acceptor_win: bool = False) -> dict:
-    winner_user_id = duel.acceptor_id if force_acceptor_win else (duel.creator_id if winner_horse == duel.horse_creator else duel.acceptor_id)
+    if force_acceptor_win:
+        winner_user_id = duel.acceptor_id
+    elif winner_horse in (duel.horse_creator, duel.horse_creator_2):
+        winner_user_id = duel.creator_id
+    elif winner_horse in (duel.horse_opponent, duel.horse_opponent_2):
+        winner_user_id = duel.acceptor_id
+    else:
+        winner_user_id = duel.creator_id if winner_horse == duel.horse_creator else duel.acceptor_id
+
     if winner_user_id is None:
         raise HTTPException(status_code=409, detail="El duelo no tiene oponente registrado.")
 
@@ -374,7 +382,6 @@ def _resolve_payout(db: Session, duel: Duel, winner_horse: int, note: str, force
         }
     )
     return data
-
 
 def _resolve_morocha_duel(db: Session, duel: Duel, positions: dict, note: Optional[str]) -> dict:
     """Resuelve un duelo tipo MOROCHA evaluando el mejor puesto (top 5) de cada pareja."""
