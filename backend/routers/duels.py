@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -59,7 +59,7 @@ def available_duels(
     user: User = Depends(get_current_user),
 ):
     """Duelos abiertos por la comunidad (excluye los propios y los expirados)."""
-    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    now = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(hours=4)
 
     # Buscar duelos abiertos que ya expiraron por hora y pasarlos a resueltos con reembolso
     expired_open_duels = db.query(Duel).filter(
