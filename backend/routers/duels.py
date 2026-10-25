@@ -61,14 +61,26 @@ def available_duels(
     """Duelos abiertos por la comunidad (excluye los propios y los expirados)."""
     now = datetime.now(timezone.utc).replace(tzinfo=None)
 
-    all_open_duels = db.query(Duel).filter(Duel.status == DUEL_OPEN).all()
-    for d in all_open_duels:
-        if d.race_datetime and d.race_datetime <= now:
-            creator = db.get(User, d.creator_id)
-            if creator is not None:
-                creator.balance = round((creator.balance or 0.0) + d.stake, 2)
-            db.delete(d)
-    db.commit()
+    # Buscar duelos abiertos que ya expiraron por hora y pasarlos a resueltos con reembolso
+    expired_open_duels = db.query(Duel).filter(
+        Duel.status == DUEL_OPEN,
+        Duel.race_datetime <= now
+    ).all()
+
+    for d in expired_open_duels:
+        creator = db.get(User, d.creator_id)
+        if creator is not None:
+            creator.balance = round((creator.balance or 0.0) + d.stake, 2)
+        
+        d.status = DUEL_RESOLVED
+        d.winner_id = None
+        d.winner_horse_number = None
+        d.payout_amount = 0.0
+        d.resolution_note = "Duelo expirado sin oponente -> Reembolso automático de stake."
+        d.resolved_at = datetime.utcnow()
+
+    if expired_open_duels:
+        db.commit()
 
     duels = (
         db.query(Duel)
