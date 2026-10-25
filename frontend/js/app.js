@@ -631,7 +631,7 @@ function duelCard(duel, actionsHtml = "") {
 
   let personalOutcome = null; 
   if (isResolved) {
-    if (!duel.winner_id || duel.winner_username === null || duel.payout_amount === 0 && duel.pot === 0) {
+    if (!duel.winner_id || duel.winner_username === null || (duel.payout_amount === 0 && duel.pot === 0) || (duel.resolution_note && duel.resolution_note.includes("Reembolso"))) {
       personalOutcome = "TIE";
     } else if (App.user && duel.winner_id === App.user.id) {
       personalOutcome = "WIN";
@@ -652,7 +652,7 @@ function duelCard(duel, actionsHtml = "") {
       statusBadgeHtml = '<span class="badge bg-rose-100 text-rose-800 font-extrabold px-2.5 py-1 rounded-full text-[10px]">❌ PERDISTE</span>';
     } else if (personalOutcome === "TIE") {
       cardBorderClass = "border-amber-200 bg-amber-50/20";
-      statusBadgeHtml = '<span class="badge bg-amber-100 text-amber-800 font-extrabold px-2.5 py-1 rounded-full text-[10px]">🤝 EMPATE / REEMBOLSO</span>';
+      statusBadgeHtml = '<span class="badge bg-amber-100 text-amber-800 font-extrabold px-2.5 py-1 rounded-full text-[10px]">🤝 REEMBOLSADO</span>';
     }
   }
   
@@ -819,13 +819,12 @@ async function loadCreateDuel() {
   });
 
   const now = new Date();
+  // Listamos todas las carreras agrupadas, priorizando las que no estén cerradas manualmente
   const openRaceNumbers = Object.keys(racesByNumber)
     .filter((rNum) => {
       const rows = racesByNumber[rNum];
       const isClosedManually = rows.some((h) => h.is_closed === true);
-      const firstEntry = rows[0];
-      const raceTime = firstEntry && firstEntry.race_datetime ? new Date(firstEntry.race_datetime) : null;
-      return !isClosedManually && (!raceTime || raceTime > now);
+      return !isClosedManually; // Muestra todas las carreras de la cartelera cargada que estén abiertas
     })
     .sort((a, b) => Number(a) - Number(b));
 
@@ -918,13 +917,14 @@ function renderHorseSelects() {
 
   const horsesHtml = currentRaceEntries.map((e) => {
     let rawName = String(e.horse_name || "");
-    rawName = rawName.split(/Precio/i)[0];
+    // Cortar cualquier etiqueta de precio de forma limpia
+    rawName = rawName.split(/Precio/i)[0].split(/\$/)[0];
     rawName = rawName.replace(/^(N[º°.]\s*\d+|[-–—]+)\s*/i, "").trim();
     rawName = rawName.replace(/[-–—:$]+$/, "").trim();
 
     return {
       number: e.horse_number,
-      name: rawName
+      name: rawName || `Ejemplar ${e.horse_number}`
     };
   });
 
