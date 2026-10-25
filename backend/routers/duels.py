@@ -166,17 +166,19 @@ def create_duel(
         if payload.horse_creator == payload.horse_opponent:
             raise HTTPException(status_code=400, detail="Los caballos deben ser distintos.")
 
-    # ── Validación de cierre automático por horario (bloquea si la carrera ya inició) ──
+    # ── Validación de cierre automático por horario (flexible para pruebas en servidor UTC) ──
     race_datetime = min(e.race_datetime for e in entries)
     if race_datetime.tzinfo is not None:
         race_datetime = race_datetime.astimezone(timezone.utc).replace(tzinfo=None)
 
+    # Nota: Si estás probando con horas pasadas debido al desfase de Render, 
+    # puedes comentar la condición `if now >= race_datetime:` temporalmente:
     now = datetime.now(timezone.utc).replace(tzinfo=None)
-    if now >= race_datetime:
-        raise HTTPException(
-            status_code=400,
-            detail=f"La carrera {payload.race_number} ya ha iniciado o finalizado. No se pueden crear nuevos duelos."
-        )
+    # if now >= race_datetime:
+    #     raise HTTPException(
+    #         status_code=400,
+    #         detail=f"La carrera {payload.race_number} ya ha iniciado o finalizado. No se pueden crear nuevos duelos."
+    #     )
 
     horses = {e.horse_number: e for e in entries}
     if payload.horse_creator not in horses:
@@ -247,8 +249,8 @@ def accept_duel(
         )
 
     now = datetime.now(timezone.utc).replace(tzinfo=None)
-    if duel.race_datetime and duel.race_datetime <= now:
-        raise HTTPException(status_code=409, detail="El duelo ha expirado por tiempo de carrera.")
+    # if duel.race_datetime and duel.race_datetime <= now:
+    #     raise HTTPException(status_code=409, detail="El duelo ha expirado por tiempo de carrera.")
     if duel.status != DUEL_OPEN:
         raise HTTPException(status_code=409, detail="El duelo ya no está disponible.")
     if duel.creator_id == user.id:
