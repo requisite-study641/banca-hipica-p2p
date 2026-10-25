@@ -384,57 +384,64 @@ def _resolve_payout(db: Session, duel: Duel, winner_horse: int, note: str, force
     return data
 
 def _resolve_morocha_duel(db: Session, duel: Duel, positions: dict, note: Optional[str]) -> dict:
-    """Resuelve un duelo tipo MOROCHA evaluando el mejor puesto (top 5) de cada pareja."""
+    """Resuelve un duelo tipo MOROCHA: 
+    Evalúa los 4 caballos (2 del creador y 2 del rival) contra el marcador oficial (top 5).
+    Gana el bando que posea el ejemplar con mejor posición (menor número).
+    Si ninguno de los 4 entra en el top 5, se anula y se reembolsa sin comisión."""
+    
     c1, c2 = duel.horse_creator, duel.horse_creator_2
     o1, o2 = duel.horse_opponent, duel.horse_opponent_2
 
-    def get_best_pos(*horses):
-        valid_pos = [positions.get(h) for h in horses if positions.get(h) is not None and 1 <= positions.get(h) <= 5]
-        return min(valid_pos) if valid_pos else None
+    # Recopilar parejas válidas (caballo, posición) para cada bando dentro del top 5 (1 al 5)
+    creator_entries = [(h, positions.get(h)) for h in (c1, c2) if positions.get(h) in (1, 2, 3, 4, 5)]
+    opponent_entries = [(h, positions.get(h)) for h in (o1, o2) if positions.get(h) in (1, 2, 3, 4, 5)]
 
-    best_creator = get_best_pos(c1, c2)
-    best_opponent = get_best_pos(o1, o2)
+    # Obtener el mejor registro (menor posición numérica) para el creador y el oponente
+    best_creator = min(creator_entries, key=lambda x: x[1]) if creator_entries else None    # Retorna (horse, pos)
+    best_opponent = min(opponent_entries, key=lambda x: x[1]) if opponent_entries else None  # Retorna (horse, pos)
 
-    # Ambos bandos fuera del top 5 -> Reembolso sin comisión
-    if best_creator is None and best_opponent is None:
+    # 1. Ambos bandos totalmente fuera del top 5 -> Reembolso total sin comisión
+    if not best_creator and not best_opponent:
         return _resolve_refund(
-            db, duel, note or "Ambos bandos fuera del top 5: reembolso sin comisión."
+            db, duel, note or "Morocha: Ninguno de los 4 caballos clasificó en el top 5 -> reembolso sin comisión."
         )
 
-    # Solo el creador clasifica en el top 5
-    if best_creator is not None and best_opponent is None:
-        winning_horse = c1 if get_best_pos(c1) == best_creator else c2
+    # 2. Solo el creador clasifica en el top 5
+    if best_creator and not best_opponent:
+        h_win, p_win = best_creator
         return _resolve_payout(
-            db, duel, winning_horse,
-            note or f"Morocha: El bando creador clasifica en el top 5 (puesto {best_creator}.º) y el rival queda fuera."
+            db, duel, h_win,
+            note or f"Morocha: Gana el creador con el N.º {h_win} ({p_win}.º puesto) — rivales fuera del top 5."
         )
 
-    # Solo el rival clasifica en el top 5
-    if best_creator is None and best_opponent is not None:
-        winning_horse = o1 if get_best_pos(o1) == best_opponent else o2
+    # 3. Solo el rival clasifica en el top 5
+    if not best_creator and best_opponent:
+        h_win, p_win = best_opponent
         return _resolve_payout(
-            db, duel, winning_horse,
-            note or f"Morocha: El bando rival clasifica en el top 5 (puesto {best_opponent}.º) y el creador queda fuera.",
+            db, duel, h_win,
+            note or f"Morocha: Gana el rival con el N.º {h_win} ({p_win}.º puesto) — creador fuera del top 5.",
             force_acceptor_win=True
         )
 
-    # Ambos clasifican, gana el que tenga el mejor puesto (menor número)
-    if best_creator < best_opponent:
-        winning_horse = c1 if get_best_pos(c1) == best_creator else c2
+    # 4. Ambos clasifican: gana el que tenga estrictamente la mejor posición (menor número)
+    h_c, p_c = best_creator
+    h_o, p_o = best_opponent
+
+    if p_c < p_o:
         return _resolve_payout(
-            db, duel, winning_horse,
-            note or f"Morocha: Gana el creador con mejor puesto ({best_creator}.º vs {best_opponent}.º)."
+            db, duel, h_c,
+            note or f"Morocha: Gana el creador con el N.º {h_c} ({p_c}.º vs {p_o}.º del rival)."
         )
-    elif best_opponent < best_creator:
-        winning_horse = o1 if get_best_pos(o1) == best_opponent else o2
+    elif p_o < p_c:
         return _resolve_payout(
-            db, duel, winning_horse,
-            note or f"Morocha: Gana el rival con mejor puesto ({best_opponent}.º vs {best_creator}.º).",
+            db, duel, h_o,
+            note or f"Morocha: Gana el rival con el N.º {h_o} ({p_o}.º vs {p_c}.º del creador).",
             force_acceptor_win=True
         )
     else:
+        # En caso de coincidencia exacta de posición
         return _resolve_refund(
-            db, duel, note or f"Morocha: Empate exacto en la mejor posición ({best_creator}.º), reembolso."
+            db, duel, note or f"Morocha: Empate exacto en la posición {p_c}.º, reembolso."
         )
 
 
