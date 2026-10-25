@@ -63,12 +63,20 @@ DATABASE_URL = os.environ.get("DATABASE_URL")
 if DATABASE_URL:
     if DATABASE_URL.startswith("postgres://"):
         DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
+    # Forzar el uso del driver psycopg2 explícitamente para SQLAlchemy 2.0
+    if DATABASE_URL.startswith("postgresql://") and not DATABASE_URL.startswith("postgresql+"):
+        DATABASE_URL = DATABASE_URL.replace("postgresql://", "postgresql+psycopg2://", 1)
     engine = create_engine(DATABASE_URL)
 else:
     DB_PATH = Path(
         os.environ.get("BANCA_DB_PATH") or (Path(__file__).resolve().parent / "banca_hipica.db")
     )
     engine = create_engine(f"sqlite:///{DB_PATH}", connect_args={"check_same_thread": False})
+
+SessionLocal = sessionmaker(
+    bind=engine, autoflush=False, autocommit=False, expire_on_commit=False
+)
+Base = declarative_base()
 
 SessionLocal = sessionmaker(
     bind=engine, autoflush=False, autocommit=False, expire_on_commit=False
