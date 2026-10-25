@@ -420,20 +420,30 @@ def _resolve_morocha_duel(db: Session, duel: Duel, positions: dict, note: Option
     Gana el bando que posea el ejemplar con mejor posición (menor número).
     Si ninguno de los 4 entra en el top 5, se anula y se reembolsa sin comisión."""
     
-    c1, c2 = duel.horse_creator, duel.horse_creator_2
-    o1, o2 = duel.horse_opponent, duel.horse_opponent_2
+    # Extraemos correctamente los 4 caballos de la Morocha
+    c1 = duel.horse_creator
+    c2 = getattr(duel, "horse_creator_2", None)
+    o1 = duel.horse_opponent
+    o2 = getattr(duel, "horse_opponent_2", None)
 
-    creator_entries = [(h, positions.get(h)) for h in (c1, c2) if positions.get(h) in (1, 2, 3, 4, 5)]
-    opponent_entries = [(h, positions.get(h)) for h in (o1, o2) if positions.get(h) in (1, 2, 3, 4, 5)]
+    # Recopilar parejas válidas (caballo, posición) para cada bando dentro del top 5 (1 al 5)
+    creator_horses = [h for h in (c1, c2) if h is not None]
+    opponent_horses = [h for h in (o1, o2) if h is not None]
 
-    best_creator = min(creator_entries, key=lambda x: x[1]) if creator_entries else None
-    best_opponent = min(opponent_entries, key=lambda x: x[1]) if opponent_entries else None
+    creator_entries = [(h, positions.get(h)) for h in creator_horses if positions.get(h) in (1, 2, 3, 4, 5)]
+    opponent_entries = [(h, positions.get(h)) for h in opponent_horses if positions.get(h) in (1, 2, 3, 4, 5)]
 
+    # Obtener el mejor registro (menor posición numérica) para el creador y el oponente
+    best_creator = min(creator_entries, key=lambda x: x[1]) if creator_entries else None    # Retorna (horse, pos)
+    best_opponent = min(opponent_entries, key=lambda x: x[1]) if opponent_entries else None  # Retorna (horse, pos)
+
+    # 1. Ambos bandos totalmente fuera del top 5 -> Reembolso total sin comisión
     if not best_creator and not best_opponent:
         return _resolve_refund(
             db, duel, note or "Morocha: Ninguno de los 4 caballos clasificó en el top 5 -> reembolso sin comisión."
         )
 
+    # 2. Solo el creador clasifica en el top 5
     if best_creator and not best_opponent:
         h_win, p_win = best_creator
         return _resolve_payout(
@@ -441,6 +451,7 @@ def _resolve_morocha_duel(db: Session, duel: Duel, positions: dict, note: Option
             note or f"Morocha: Gana el creador con el N.º {h_win} ({p_win}.º puesto) — rivales fuera del top 5."
         )
 
+    # 3. Solo el rival clasifica en el top 5
     if not best_creator and best_opponent:
         h_win, p_win = best_opponent
         return _resolve_payout(
@@ -449,6 +460,7 @@ def _resolve_morocha_duel(db: Session, duel: Duel, positions: dict, note: Option
             force_acceptor_win=True
         )
 
+    # 4. Ambos clasifican: gana el que tenga estrictamente la mejor posición (menor número)
     h_c, p_c = best_creator
     h_o, p_o = best_opponent
 
@@ -464,10 +476,11 @@ def _resolve_morocha_duel(db: Session, duel: Duel, positions: dict, note: Option
             force_acceptor_win=True
         )
     else:
+        # En caso de coincidencia exacta de posición (empate entre los mejores de cada bando)
         return _resolve_refund(
             db, duel, note or f"Morocha: Empate exacto en la posición {p_c}.º, reembolso."
         )
-
+    
 
 def resolve_duel_core(
     db: Session,
